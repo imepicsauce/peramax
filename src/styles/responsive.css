@@ -445,7 +445,7 @@
   }
   .desktop-nav-brand {
     display: block;
-    font: 800 28px "Righteous";
+    font: 400 28px "Righteous", sans-serif;
     letter-spacing: -0.7px;
     padding: 0 12px;
     margin-bottom: 35px;

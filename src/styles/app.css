@@ -104,7 +104,7 @@ header {
   border-bottom: 1px solid #e5e8dd;
 }
 .brand {
-  font: 800 26px "Righteous";
+  font: 400 26px "Righteous", sans-serif;
   letter-spacing: -0.7px;
   border: 0;
   padding: 0;
