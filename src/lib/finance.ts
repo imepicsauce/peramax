@@ -121,3 +121,47 @@ export function elapsedDays(start: string, end: string, today: string) {
     ) + 1,
   );
 }
+
+/** Allocate monthly allowance by calendar day, rounding only the total to centavos. */
+export function weeklyAllowance(plan: Plan, start: string): number | null {
+  if (plan.allowance === null) return null;
+  if (plan.frequency === "week") return plan.allowance;
+  if (plan.frequency === "day") return plan.allowance * 7;
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const range = periodRange(shiftDate(start, i), "month");
+    total += plan.allowance / Number(range.end.slice(-2));
+  }
+  return Math.round(total);
+}
+export function weeklySavingSummary(entries: Expense[], plan: Plan, today: string) {
+  const goal = plan.weeklySaving;
+  if (!goal) return null;
+  const end = shiftDate(goal.start, 6);
+  const budget = weeklyAllowance(plan, goal.start);
+  const spent = sumExpenses(expensesInRange(entries, goal.start, end));
+  const left = budget === null ? null : budget - spent;
+  const finished = today > end;
+  const status = today < goal.start ? "Upcoming" : left === null ? "Set allowance" :
+    finished ? (left >= goal.amount ? "Goal met" : "Goal missed") :
+    left >= goal.amount ? "On track" : "Below target";
+  return { ...goal, end, budget, spent, left, finished, status };
+}
+
+export function budgetWarnings(entries: Expense[], plan: Plan, today: string) {
+  const summary = planSummary(entries, plan, today);
+  const period = { day: "today", week: "this week", month: "this month" }[plan.frequency];
+  return [
+    { key: "allowance", name: "Allowance", limit: plan.allowance, spent: summary.spent, period },
+    ...summary.limits.map(item => ({ ...item, name: item.title, period: item.key === "daily" ? "today" : "this week" })),
+  ].flatMap(item => {
+    if (item.limit === null || item.spent * 5 < item.limit * 4) return [];
+    const left = item.limit - item.spent;
+    const title = left < 0 ? `${item.name} exceeded` : left === 0 ?
+      (item.key === "allowance" ? "Allowance used up" : `${item.name} reached`) :
+      (item.key === "allowance" ? "Allowance is low" : `${item.name} nearly reached`);
+    const detail = left < 0 ? `${money(-left)} over ${item.period}.` : left === 0 ?
+      `No amount left ${item.period}.` : `${money(left)} left ${item.period}.`;
+    return [{ key: item.key, title, detail, severity: left <= 0 ? "danger" : "caution" }];
+  });
+}

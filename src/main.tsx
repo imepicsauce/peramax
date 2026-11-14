@@ -5,6 +5,7 @@ import App from "./App";
 import "./styles/app.css";
 import "./styles/effects.css";
 import "./styles/responsive.css";
+import "./styles/surfaces.css";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MotionConfig reducedMotion="user">

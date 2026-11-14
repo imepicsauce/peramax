@@ -80,6 +80,10 @@ select {
 .allowance-card[data-scroll-morph] {
   --morph-radius: 17px;
 }
+.weekly-saving-card[data-scroll-morph] {
+  --morph-radius: 20px;
+  padding-inline: calc(20px + var(--morph-edge) * 6px);
+}
 .summary[data-scroll-morph],
 .limit-card[data-scroll-morph] {
   --morph-radius: 12px;

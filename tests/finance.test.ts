@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  weeklyAllowance,
+  weeklySavingSummary,
   parseAmount,
   periodRange,
   todayInManila,
@@ -75,4 +77,26 @@ describe("financial rules", () => {
     expect(result.limits[0].spent).toBe(40000);
     expect(planSummary(entries, emptyPlan, "2026-11-10").left).toBeNull();
   });
+});
+
+it("allocates monthly allowance across months and leap years", () => {
+  const plan = { ...emptyPlan, allowance: 310000, frequency: "month" as const };
+  expect(weeklyAllowance(plan, "2026-11-30")).toBe(Math.round(310000 / 30 + 60000));
+  expect(weeklyAllowance({ ...plan, allowance: 290000 }, "2028-02-07")).toBe(70000);
+  expect(weeklyAllowance({ ...plan, frequency: "day" }, "2026-11-09")).toBe(2170000);
+});
+it("finishes a weekly goal only after Sunday and counts only its expenses", () => {
+  const plan = { ...emptyPlan, allowance: 100000, weeklySaving: { amount: 30000, start: "2026-11-09" } };
+  const entry: Expense = { id: "x", amount: 60000, date: "2026-11-10", category: "Food", payment: "Cash", note: "" };
+  expect(weeklySavingSummary([entry], plan, "2026-11-15")?.status).toBe("On track");
+  expect(weeklySavingSummary([entry], plan, "2026-11-16")?.status).toBe("Goal met");
+  expect(weeklySavingSummary([{ ...entry, amount: 110000 }], plan, "2026-11-16")?.left).toBe(-10000);
+  expect(weeklySavingSummary([{ ...entry, date: "2026-11-16" }], plan, "2026-11-16")?.spent).toBe(0);
+  expect(weeklySavingSummary([], plan, "2026-11-08")?.status).toBe("Upcoming");
+});
+it("resets monthly allowance at calendar boundaries", () => {
+ const entry: Expense = { id: "x", amount: 20000, date: "2026-11-30", category: "Food", payment: "Cash", note: "" };
+ const plan = { ...emptyPlan, allowance: 100000, frequency: "month" as const };
+ expect(planSummary([entry], plan, "2026-11-30").left).toBe(80000);
+ expect(planSummary([entry], plan, "2026-12-01").left).toBe(100000);
 });

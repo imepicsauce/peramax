@@ -116,3 +116,24 @@ describe("core app journeys", () => {
     ).toBeInTheDocument();
   });
 });
+
+it("saves and restores a monthly plan with a weekly unspent goal, then removes it", async () => {
+ const user = userEvent.setup();
+ const view = start();
+ await user.click(screen.getByRole("button", { name: "My plan" }));
+ await user.type(screen.getByLabelText("Allowance (₱)"), "3000");
+ await user.selectOptions(screen.getByLabelText("Repeat every"), "month");
+ await user.type(screen.getByLabelText("Keep unspent (₱)"), "200");
+ fireEvent.change(screen.getByLabelText("Week containing"), { target: { value: "2026-11-12" } });
+ await user.click(screen.getByRole("button", { name: "Save plan" }));
+ expect(stored().plan.weeklySaving).toEqual({ amount: 20000, start: "2026-11-09" });
+ expect(stored().plan.frequency).toBe("month");
+ view.unmount();
+ render(<App />);
+ expect(screen.getByText("THIS MONTH’S ALLOWANCE")).toBeInTheDocument();
+ await user.click(screen.getByRole("button", { name: "My plan" }));
+ expect(screen.getByLabelText("Keep unspent (₱)")).toHaveValue(200);
+ await user.clear(screen.getByLabelText("Keep unspent (₱)"));
+ await user.click(screen.getByRole("button", { name: "Save plan" }));
+ expect(stored().plan.weeklySaving).toBeNull();
+});

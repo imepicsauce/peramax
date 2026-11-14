@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
-import { money, planSummary, formatDate } from "../lib/finance";
+import { money, planSummary, formatDate, weeklySavingSummary } from "../lib/finance";
 import type { Expense, Plan } from "../lib/types";
 export function Dashboard({
   expenses,
@@ -13,7 +13,8 @@ export function Dashboard({
   onPlan: () => void;
 }) {
   const info = planSummary(expenses, plan, today),
-    reduce = useReducedMotion();
+    reduce = useReducedMotion(),
+    saving = weeklySavingSummary(expenses, plan, today);
   return (
     <section className="money-home">
       <div className="allowance-card">
@@ -21,7 +22,7 @@ export function Dashboard({
           <span>
             {plan.frequency === "week"
               ? "THIS WEEK’S ALLOWANCE"
-              : "TODAY’S ALLOWANCE"}
+              : plan.frequency === "month" ? "THIS MONTH’S ALLOWANCE" : "TODAY’S ALLOWANCE"}
           </span>
           <button onClick={onPlan}>Manage ↗</button>
         </div>
@@ -72,8 +73,8 @@ export function Dashboard({
           <span>○ Allowance left</span>
         </div>
         <p className="balance-dates">
-          {plan.frequency === "week"
-            ? `${formatDate(info.start)} – ${formatDate(info.end, { month: "short", day: "numeric", year: "numeric" })} · Mon–Sun`
+          {plan.frequency !== "day"
+            ? `${formatDate(info.start)} – ${formatDate(info.end, { month: "short", day: "numeric", year: "numeric" })}${plan.frequency === "week" ? " · Mon–Sun" : ""}`
             : formatDate(today, {
                 weekday: "long",
                 month: "short",
@@ -82,6 +83,23 @@ export function Dashboard({
         </p>
       </div>
       <section>
+        <div className="weekly-saving-card">
+          <div className="sectionhead">
+            <h2>Weekly saving goal</h2>
+            <button className="textbutton" onClick={onPlan}>{saving ? "Edit ↗" : "Set goal ↗"}</button>
+          </div>
+          {saving ? <>
+            <p className="saving-status">{saving.status} · {formatDate(saving.start)} – {formatDate(saving.end, { month: "short", day: "numeric", year: "numeric" })}</p>
+            <strong className="saving-value">{money(saving.amount)}</strong>
+            <p className="help">to keep unspent by Sunday</p>
+            <div className="balance-split">
+              <div><span>Week’s allowance</span><strong>{saving.budget === null ? "Not set" : money(saving.budget)}</strong></div>
+              <div><span>{saving.finished ? "Unspent" : "Unspent now"}</span><strong>{saving.left === null ? "Not set" : money(saving.left)}</strong></div>
+            </div>
+            <p className="help">{saving.left === null ? "Set your allowance in My plan." : saving.finished ? "Based on logged expenses for this week." : today < saving.start ? "Your goal starts on Monday." : saving.left >= saving.amount ? `${money(saving.left - saving.amount)} available to spend while keeping your goal.` : `${money(saving.amount - saving.left)} below your savings target.`}</p>
+            {plan.frequency === "month" && <p className="help">Monthly allowance prorated by calendar days.</p>}
+          </> : <p className="help">Choose how much of your allowance to keep unspent this week.</p>}
+        </div>
         <div className="sectionhead">
           <h2>Spending limits</h2>
           <button className="textbutton" onClick={onPlan}>
@@ -97,7 +115,7 @@ export function Dashboard({
               <button
                 key={limit.key}
                 className={
-                  "limit-card" + (left !== null && left < 0 ? " exceeded" : "")
+                  "limit-card" + (left !== null && left <= 0 ? " exceeded" : ratio >= 0.8 ? " nearing" : "")
                 }
                 onClick={onPlan}
               >
@@ -108,7 +126,7 @@ export function Dashboard({
                       ? "Set limit ↗"
                       : left < 0
                         ? "Over limit"
-                        : ratio >= 0.8
+                        : left === 0 ? "Limit reached" : ratio >= 0.8
                           ? "Getting close"
                           : "On track"}
                   </span>

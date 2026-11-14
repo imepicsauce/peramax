@@ -102,3 +102,8 @@ Navigation is currently state-based within one page, so no path-routing rewrites
 Installation and offline/update testing are documented in `docs/PWA.md`.
 
 Next: follow `docs/ROADMAP.md` to add authentication and Supabase, then an explicit offline synchronization design.
+
+### Weekly allowance savings
+My plan supports daily, weekly, and calendar-month allowances. A weekly saving goal tracks money left unspent for one selected Monday–Sunday week, separately from manually recorded Savings. Daily allowance is multiplied by seven; monthly allowance is allocated by each calendar day's share (including weeks spanning two months), rounded once to centavos. Editing the allowance recalculates the selected goal. Goal success is evaluated after Sunday using logged expenses; no savings transfer or automatic renewal occurs. Blank target removes the goal. Existing stored plans remain compatible.
+
+Budget warnings appear across Home, Activity, and Insights at 80% of a configured allowance or daily/weekly limit. At 100% they show reached/used up, and above 100% they show the excess in pesos. Warnings recalculate after edits, deletions, plan changes, and Philippine calendar rollover. These are in-app reminders, not push notifications.

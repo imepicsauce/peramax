@@ -29,7 +29,8 @@ export interface Expense {
 }
 export interface Plan {
   allowance: number | null;
-  frequency: "day" | "week";
+  frequency: Period;
+  weeklySaving?: { amount: number; start: string } | null;
   daily: number | null;
   weekly: number | null;
 }

@@ -32,7 +32,8 @@ export function isExpense(v: unknown): v is Expense {
 export function isPlan(v: unknown): v is Plan {
   return (
     object(v) &&
-    (v.frequency === "day" || v.frequency === "week") &&
+    (v.frequency === "day" || v.frequency === "week" || v.frequency === "month") &&
+    (v.weeklySaving == null || (object(v.weeklySaving) && validMoney(v.weeklySaving.amount) && isDate(v.weeklySaving.start) && new Date(v.weeklySaving.start + "T12:00:00Z").getUTCDay() === 1)) &&
     ["allowance", "daily", "weekly"].every(
       (k) => v[k] === null || validMoney(v[k]),
     )

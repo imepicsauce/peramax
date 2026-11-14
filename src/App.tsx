@@ -4,6 +4,7 @@ import { Icon, type IconName } from "./components/Icon";
 import { PwaControls } from "./components/PwaControls";
 import { PointerGlow } from "./components/PointerGlow";
 import { Sheet } from "./components/Sheet";
+import { BudgetWarnings } from "./components/BudgetWarnings";
 import { Dashboard } from "./features/Dashboard";
 import { ExpenseForm } from "./features/ExpenseForm";
 import { PlanForm } from "./features/PlanForm";
@@ -167,6 +168,7 @@ export default function App() {
               {warning}
             </p>
           )}
+          <BudgetWarnings expenses={state.expenses} plan={state.plan} today={today} onPlan={() => setModal({ type: "plan" })} />
           <motion.div
             key={screen}
             className={`screen-content screen-${screen}`}

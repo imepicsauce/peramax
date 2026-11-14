@@ -31,7 +31,7 @@ export function useScrollMorph(ref: RefObject<HTMLElement | null>) {
         }
       main!
         .querySelectorAll<HTMLElement>(
-          ".allowance-card,.limit-card,.summary,.transaction",
+          ".allowance-card,.weekly-saving-card,.limit-card,.summary,.transaction",
         )
         .forEach((el) => {
           if (tracked.has(el)) return;
