@@ -1,0 +1,46 @@
+const { chromium } = require('playwright');
+const fs = require('node:fs');
+const path = require('node:path');
+(async () => {
+  const browser = await chromium.launch({ executablePath: 'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe', headless: true });
+  const directory = path.join(__dirname, 'screenshots');
+  fs.mkdirSync(directory, { recursive: true });
+  const errors = [];
+  for (const [name, width, height] of [['desktop',1280,900], ['phone',390,844]]) {
+    const context = await browser.newContext({viewport:{width,height}});
+    const page = await context.newPage();
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if(message.type()==='error') errors.push(message.text()); });
+    await page.goto('http://127.0.0.1:5454', {waitUntil:'networkidle', timeout:60000});
+    await page.waitForSelector('flutter-view', {timeout:60000});
+    const semantics = page.locator('flt-semantics-placeholder');
+    if (await semantics.count()) await semantics.evaluate(element => element.click());
+    await page.getByText('Your money, at a glance', {exact:true}).waitFor({state:'attached',timeout:30000});
+    await page.screenshot({path:path.join(directory,`${name}-home.png`)});
+    console.log(name, (await page.locator('body').innerText()).slice(0,1200));
+    await page.getByRole('button', {name:'Add expense',exact:true}).click();
+    await page.getByRole('textbox', {name:/^Amount/}).click();
+    await page.keyboard.type('125.50');
+    await page.getByRole('textbox', {name:/^Note/}).click();
+    await page.keyboard.type('Lunch at the carinderia');
+    await page.keyboard.press('Tab');
+    await page.screenshot({path:path.join(directory,`${name}-expense.png`)});
+    await page.getByRole('button', {name:'Save expense',exact:true}).click();
+    await page.getByRole('button', {name:'Save expense',exact:true}).waitFor({state:'detached'});
+    const stored = await page.evaluate(() => Object.values(localStorage).find(value => value.includes('Lunch at the carinderia')));
+    if (!stored || !stored.includes('12550')) throw new Error('Expense was not persisted');
+    await page.reload({waitUntil:'networkidle'});
+    const reloadSemantics = page.locator('flt-semantics-placeholder');
+    if(await reloadSemantics.count()) await reloadSemantics.evaluate(element=>element.click());
+    await page.getByText('Your money, at a glance', {exact:true}).waitFor({state:'attached'});
+    const restored = await page.evaluate(() => Object.values(localStorage).find(value => value.includes('Lunch at the carinderia')));
+    if (restored !== stored) throw new Error('Expense changed across reload');
+    await page.mouse.move(width / 2, height / 2);
+    await page.mouse.wheel(0, 450);
+    await page.screenshot({path:path.join(directory,`${name}-populated.png`)});
+    await context.close();
+  }
+  await browser.close();
+  console.log(JSON.stringify({errors}));
+  if(errors.length) process.exitCode=1;
+})().catch(error=>{console.error(error);process.exit(1);});

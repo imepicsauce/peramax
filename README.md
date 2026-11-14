@@ -1,5 +1,11 @@
 # Peramax
 
+## Flutter Android app
+
+The native Flutter version lives in [`flutter_app/`](flutter_app/README.md). Run `flutter pub get` and `flutter run` from that directory. The React app below remains available as a separate implementation; records do not automatically transfer between the two apps.
+
+Android installer and GitHub Release packaging: [installation instructions](flutter_app/INSTALL.md) · [release guide](flutter_app/RELEASING.md).
+
 A mobile-first personal expense tracker for everyday Filipino use, built with **React 19, TypeScript, Vite, and Motion for React**. This repository is the working application migrated from the interactive design prototype.
 
 ## Run locally

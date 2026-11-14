@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Peramax: your expenses, allowance and savings in one place.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="peramax">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Peramax</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1d392b">
+  <style>
+    body { margin: 0; background: #f5f4ef; }
+    #launch-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      display: grid; place-content: center; justify-items: center; gap: 16px;
+      background: #1d392b; color: #f5f4ef;
+      font: 700 26px/1.2 Arial, sans-serif; letter-spacing: -.03em;
+    }
+    #launch-screen img { width: 144px; height: 144px; animation: launch-in 320ms ease-out both; }
+    #launch-screen p { max-width: 280px; margin: 0; font: 400 16px/1.5 Arial, sans-serif; letter-spacing: normal; text-align: center; }
+    #launch-screen button { min-height: 48px; padding: 12px 28px; border: 0; border-radius: 24px; background: #f5f4ef; color: #1d392b; font: 700 16px Arial, sans-serif; cursor: pointer; }
+    #launch-screen button:focus-visible { outline: 2px solid #f5f4ef; outline-offset: 4px; }
+    @keyframes launch-in { from { opacity: .5; transform: scale(.96); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { #launch-screen img { animation: none; } }
+  </style>
+</head>
+<body>
+  <div id="launch-screen" role="status" aria-label="Opening Peramax">
+    <img src="icons/Icon-512.png" alt="">
+    <span aria-hidden="true">Peramax</span>
+  </div>
+  <script>
+    function showLaunchError() {
+      const launch = document.getElementById('launch-screen');
+      if (!launch || launch.querySelector('button')) return;
+      const message = document.createElement('p');
+      message.textContent = 'Peramax could not start. Check your connection and try again.';
+      const retry = document.createElement('button');
+      retry.textContent = 'Retry';
+      retry.onclick = function () { location.reload(); };
+      launch.setAttribute('role', 'alert');
+      launch.removeAttribute('aria-label');
+      launch.append(message, retry);
+    }
+    window.addEventListener('flutter-first-frame', function () {
+      document.getElementById('launch-screen')?.remove();
+    }, { once: true });
+    window.addEventListener('unhandledrejection', showLaunchError);
+  </script>
+  <script src="flutter_bootstrap.js" async onerror="showLaunchError()"></script>
+</body>
+</html>
