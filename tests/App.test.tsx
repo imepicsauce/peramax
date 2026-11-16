@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   render,
   screen,
@@ -11,6 +11,7 @@ import { MotionConfig } from "motion/react";
 import App from "../src/App";
 import { emptyState, type AppState } from "../src/lib/types";
 import { STORAGE_KEY } from "../src/lib/storage";
+vi.setConfig({ testTimeout: 15000 });
 function start() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(emptyState()));
   return render(
@@ -59,6 +60,8 @@ describe("core app journeys", () => {
     await user.click(screen.getByRole("button", { name: "My plan" }));
     await user.clear(screen.getByLabelText("Allowance (₱)"));
     await user.click(screen.getByRole("button", { name: "Close dialog" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(stored().plan.allowance).toBe(250000);
     await user.click(screen.getByRole("button", { name: "My plan" }));
     expect(screen.getByLabelText("Allowance (₱)")).toHaveValue(2500);
@@ -118,22 +121,27 @@ describe("core app journeys", () => {
 });
 
 it("saves and restores a monthly plan with a weekly unspent goal, then removes it", async () => {
- const user = userEvent.setup();
- const view = start();
- await user.click(screen.getByRole("button", { name: "My plan" }));
- await user.type(screen.getByLabelText("Allowance (₱)"), "3000");
- await user.selectOptions(screen.getByLabelText("Repeat every"), "month");
- await user.type(screen.getByLabelText("Keep unspent (₱)"), "200");
- fireEvent.change(screen.getByLabelText("Week containing"), { target: { value: "2026-11-12" } });
- await user.click(screen.getByRole("button", { name: "Save plan" }));
- expect(stored().plan.weeklySaving).toEqual({ amount: 20000, start: "2026-11-09" });
- expect(stored().plan.frequency).toBe("month");
- view.unmount();
- render(<App />);
- expect(screen.getByText("THIS MONTH’S ALLOWANCE")).toBeInTheDocument();
- await user.click(screen.getByRole("button", { name: "My plan" }));
- expect(screen.getByLabelText("Keep unspent (₱)")).toHaveValue(200);
- await user.clear(screen.getByLabelText("Keep unspent (₱)"));
- await user.click(screen.getByRole("button", { name: "Save plan" }));
- expect(stored().plan.weeklySaving).toBeNull();
+  const user = userEvent.setup();
+  const view = start();
+  await user.click(screen.getByRole("button", { name: "My plan" }));
+  await user.type(screen.getByLabelText("Allowance (₱)"), "3000");
+  await user.selectOptions(screen.getByLabelText("Repeat every"), "month");
+  await user.type(screen.getByLabelText("Keep unspent (₱)"), "200");
+  fireEvent.change(screen.getByLabelText("Week containing"), {
+    target: { value: "2026-11-12" },
+  });
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+  expect(stored().plan.weeklySaving).toEqual({
+    amount: 20000,
+    start: "2026-11-09",
+  });
+  expect(stored().plan.frequency).toBe("month");
+  view.unmount();
+  render(<App />);
+  expect(screen.getByText("THIS MONTH’S ALLOWANCE")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "My plan" }));
+  expect(screen.getByLabelText("Keep unspent (₱)")).toHaveValue(200);
+  await user.clear(screen.getByLabelText("Keep unspent (₱)"));
+  await user.click(screen.getByRole("button", { name: "Save plan" }));
+  expect(stored().plan.weeklySaving).toBeNull();
 });

@@ -1,8 +1,10 @@
+import { createPortal } from "react-dom";
 import { useState } from "react";
 import { usePwa } from "../hooks/usePwa";
 export function PwaControls({ blocked }: { blocked: boolean }) {
   const pwa = usePwa(blocked),
-    [help, setHelp] = useState(false);
+    [help, setHelp] = useState(false),
+    [dismissed, setDismissed] = useState(false);
   return (
     <section className="pwa-controls" aria-label="App installation and updates">
       <div className="pwa-row">
@@ -35,21 +37,25 @@ export function PwaControls({ blocked }: { blocked: boolean }) {
           {pwa.error}
         </p>
       )}
-      {pwa.updateAvailable && (
-        <div className="pwa-update">
-          <span>
-            {blocked
-              ? "Update ready. Finish your open form first."
-              : "A new version is ready."}
-          </span>
-          <button
-            className="secondary"
-            disabled={blocked || pwa.updating}
-            onClick={pwa.update}
-          >
-            {pwa.updating ? "Updating…" : "Update now"}
-          </button>
-        </div>
+      {pwa.updateAvailable && blocked && (
+        <p className="help" role="status">Update ready. Finish your open form first.</p>
+      )}
+      {pwa.updateAvailable && dismissed && !blocked && (
+        <button className="textbutton" onClick={() => setDismissed(false)}>Show update</button>
+      )}
+      {pwa.updateAvailable && !blocked && !dismissed && createPortal(
+        <section className="pwa-update-popup" aria-label="App update">
+          <div role="status" aria-live="polite">
+            <strong>Update ready</strong>
+            <p>A new version is available.</p>
+          </div>
+          <div className="pwa-update-actions">
+            <button className="textbutton" disabled={pwa.updating} onClick={() => setDismissed(true)}>Later</button>
+            <button className="primary" disabled={pwa.updating} onClick={pwa.update}>
+              {pwa.updating ? "Updating…" : "Update now"}
+            </button>
+          </div>
+        </section>, document.body,
       )}
     </section>
   );

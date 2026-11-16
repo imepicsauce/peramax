@@ -34,13 +34,17 @@ select {
   transform: translate(-50%, 2px);
   box-shadow: 0 2px 5px #16332428;
 }
-.header-plan:hover,
-.primary:hover,
-.nav-add:hover i {
-  background: #284936;
+@media (hover: hover) and (pointer: fine) {
+  .header-plan:hover,
+  .primary:hover,
+  .nav-add:hover i {
+    background: #284936;
+  }
 }
-.header-savings:hover {
-  background: #d9e4cd;
+@media (hover: hover) and (pointer: fine) {
+  .header-savings:hover {
+    background: #d9e4cd;
+  }
 }
 .pointer-glow {
   position: fixed;
@@ -74,15 +78,15 @@ select {
   --morph-edge: 0;
   --morph-radius: 13px;
   scale: var(--morph-x, 1) var(--morph-y, 1);
-  transform-origin: center top;
-  border-radius: calc(var(--morph-radius) + var(--morph-edge) * 20px);
+  transform-origin: center center;
+  border-radius: calc(var(--morph-radius) + var(--morph-edge) * 18px);
 }
 .allowance-card[data-scroll-morph] {
   --morph-radius: 17px;
 }
 .weekly-saving-card[data-scroll-morph] {
   --morph-radius: 20px;
-  padding-inline: calc(20px + var(--morph-edge) * 6px);
+  padding-inline: 18px;
 }
 .summary[data-scroll-morph],
 .limit-card[data-scroll-morph] {
@@ -90,9 +94,9 @@ select {
 }
 .transaction[data-scroll-morph] {
   --morph-radius: 0px;
-  padding-inline: calc(var(--morph-edge) * 16px);
-  border-radius: calc(var(--morph-edge) * 32px);
-  background-color: rgba(135, 149, 128, calc(var(--morph-edge) * 0.12));
+  padding-inline: 12px;
+  border-radius: calc(var(--morph-edge) * 28px);
+  background-color: rgba(135, 149, 128, calc(var(--morph-edge) * 0.16));
   border-bottom-color: rgba(
     112,
     119,
@@ -103,49 +107,25 @@ select {
 .transaction[data-scroll-morph] .expenseicon {
   border-radius: calc(12px + var(--morph-edge) * 8px);
 }
-.transaction[data-scroll-morph]:hover {
-  background-color: #e9ece2;
+@media (hover: hover) and (pointer: fine) {
+  .transaction[data-scroll-morph]:hover {
+    background-color: #e9ece2;
+  }
 }
 [data-scroll-morph]:focus-visible {
   scale: 1 1;
 }
-@supports (transition-behavior: allow-discrete) {
-  dialog {
+dialog[open] {
+  animation: sheet-enter 180ms var(--ease-app);
+}
+@keyframes sheet-enter {
+  from {
     opacity: 0;
-    transform: translateY(32px) scale(0.985);
-    transform-origin: bottom center;
-    transition:
-      opacity 230ms ease,
-      transform 290ms var(--ease-app),
-      display 290ms allow-discrete,
-      overlay 290ms allow-discrete;
+    transform: translateY(24px);
   }
-  dialog[open] {
+  to {
     opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  dialog::backdrop {
-    background-color: transparent;
-    backdrop-filter: blur(0);
-    transition:
-      background-color 230ms ease,
-      backdrop-filter 230ms ease,
-      display 290ms allow-discrete,
-      overlay 290ms allow-discrete;
-  }
-  dialog[open]::backdrop {
-    background-color: #0a201a77;
-    backdrop-filter: blur(2px);
-  }
-  @starting-style {
-    dialog[open] {
-      opacity: 0;
-      transform: translateY(32px) scale(0.985);
-    }
-    dialog[open]::backdrop {
-      background-color: transparent;
-      backdrop-filter: blur(0);
-    }
+    transform: translateY(0);
   }
 }
 @media (prefers-reduced-motion: reduce) {

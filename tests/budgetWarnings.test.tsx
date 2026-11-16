@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { budgetWarnings } from "../src/lib/finance";
 import { emptyPlan, type Expense } from "../src/lib/types";
+import { Dashboard } from "../src/features/Dashboard";
 import { BudgetWarnings } from "../src/components/BudgetWarnings";
 
 const entry = (amount: number, date = "2026-11-14"): Expense => ({ id: "one", amount, date, category: "Food", payment: "Cash", note: "" });
@@ -33,6 +34,28 @@ describe("budget warnings", () => {
     await userEvent.click(screen.getByRole("button", { name: /Review plan/ }));
     expect(opened).toBe(true);
     view.rerender(<BudgetWarnings {...props} expenses={[entry(7000)]} />);
-    expect(screen.queryByText("Spending heads-up")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Spending heads-up")).not.toBeInTheDocument());
   });
+});
+
+it("dismisses the banner without hiding card warnings and resurfaces at new stages or periods", async () => {
+  const user = userEvent.setup();
+  const fixture = (amount: number, today = "2026-11-14") => <>
+    <BudgetWarnings expenses={[entry(amount, today)]} plan={plan} today={today} onPlan={() => {}} />
+    <Dashboard expenses={[entry(amount, today)]} plan={plan} today={today} onPlan={() => {}} />
+  </>;
+  const view = render(fixture(8000));
+  await user.click(screen.getByRole("button", { name: "Dismiss spending heads-up" }));
+  await waitFor(() => expect(screen.queryByText("Spending heads-up")).not.toBeInTheDocument());
+  expect(screen.getAllByText("Nearly reached")).toHaveLength(2);
+  expect(screen.getByText(/Allowance is low ·/)).toBeInTheDocument();
+  view.rerender(fixture(8500));
+  expect(screen.queryByText("Spending heads-up")).not.toBeInTheDocument();
+  view.rerender(fixture(10001));
+  expect(screen.getByText("Spending heads-up")).toBeInTheDocument();
+  expect(screen.getAllByText("Over limit")).toHaveLength(2);
+  await user.click(screen.getByRole("button", { name: "Dismiss spending heads-up" }));
+  await waitFor(() => expect(screen.queryByText("Spending heads-up")).not.toBeInTheDocument());
+  view.rerender(fixture(10001, "2026-11-15"));
+  expect(screen.getByText("Spending heads-up")).toBeInTheDocument();
 });

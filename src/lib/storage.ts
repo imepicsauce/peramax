@@ -8,7 +8,6 @@ import {
   type SavingsGoal,
 } from "./types";
 import { isDate, MAX_CENTAVOS } from "./finance";
-import { demoExpenses } from "./demo";
 export const STORAGE_KEY = "peramax-react-v1";
 const validMoney = (v: unknown, zero = false): v is number =>
   typeof v === "number" &&
@@ -32,8 +31,14 @@ export function isExpense(v: unknown): v is Expense {
 export function isPlan(v: unknown): v is Plan {
   return (
     object(v) &&
-    (v.frequency === "day" || v.frequency === "week" || v.frequency === "month") &&
-    (v.weeklySaving == null || (object(v.weeklySaving) && validMoney(v.weeklySaving.amount) && isDate(v.weeklySaving.start) && new Date(v.weeklySaving.start + "T12:00:00Z").getUTCDay() === 1)) &&
+    (v.frequency === "day" ||
+      v.frequency === "week" ||
+      v.frequency === "month") &&
+    (v.weeklySaving == null ||
+      (object(v.weeklySaving) &&
+        validMoney(v.weeklySaving.amount) &&
+        isDate(v.weeklySaving.start) &&
+        new Date(v.weeklySaving.start + "T12:00:00Z").getUTCDay() === 1)) &&
     ["allowance", "daily", "weekly"].every(
       (k) => v[k] === null || validMoney(v[k]),
     )
@@ -54,6 +59,8 @@ export function isState(v: unknown): v is AppState {
   return (
     object(v) &&
     v.schemaVersion === 1 &&
+    (v.lastPayment === undefined ||
+      payments.includes(v.lastPayment as never)) &&
     Array.isArray(v.expenses) &&
     v.expenses.every(isExpense) &&
     isPlan(v.plan) &&
@@ -88,8 +95,7 @@ export function browserRepository(storage: Storage): Repository {
           if (!Array.isArray(entries) || !entries.every(isExpense))
             throw new Error("Invalid legacy expenses");
           state.expenses = entries;
-        } else if (planRaw === null && goalRaw === null)
-          state.expenses = demoExpenses(today);
+        }
         if (planRaw !== null) {
           const plan: unknown = JSON.parse(planRaw);
           if (!isPlan(plan)) throw new Error("Invalid legacy plan");

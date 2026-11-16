@@ -1,4 +1,7 @@
-import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
+import { appEase, progressDuration } from "../lib/motion";
+import { useAppMotion } from "../hooks/useAppMotion";
+import { motion } from "motion/react";
 import {
   categories,
   type Category,
@@ -28,7 +31,7 @@ export function PeriodPicker({
   onMove: (n: number) => void;
   onToday: () => void;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useAppMotion();
   return (
     <div className="toolbar">
       <div className="segments" aria-label="Reporting period">
@@ -43,7 +46,7 @@ export function PeriodPicker({
               <motion.span
                 className="segment-pill"
                 layoutId="period-pill"
-                transition={{ duration: reduce ? 0 : 0.24 }}
+                transition={{ duration: reduce ? 0 : 0.2, ease: appEase }}
               />
             )}
             <span>{p[0].toUpperCase() + p.slice(1)}</span>
@@ -130,10 +133,12 @@ export function Transactions({
   entries,
   today,
   onEdit,
+  emptyMessage = "No expenses for this period.",
 }: {
   entries: Expense[];
   today: string;
   onEdit: (entry: Expense) => void;
+  emptyMessage?: string;
 }) {
   return (
     <div className="rows">
@@ -152,7 +157,16 @@ export function Transactions({
             key={entry.id}
             onClick={() => onEdit(entry)}
             aria-label={`Edit ${entry.note || entry.category}`}
+            aria-describedby={`expense-details-${entry.id}`}
           >
+            <span className="sr-only" id={`expense-details-${entry.id}`}>
+              {money(entry.amount)} · {entry.category} · {entry.payment} ·{" "}
+              {formatDate(entry.date, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
             <span className="expense-name">
               <span className="expenseicon">
                 <Icon name={categoryIcon[entry.category]} />
@@ -164,6 +178,7 @@ export function Transactions({
                   <span className="mobile-transaction-date">
                     {" "}
                     · {entry.date === today ? "Today" : formatDate(entry.date)}
+                    <span className="mobile-payment"> · {entry.payment}</span>
                   </span>
                 </small>
               </span>
@@ -182,7 +197,7 @@ export function Transactions({
           </button>
         ))
       ) : (
-        <p className="empty">No expenses for this period.</p>
+        <p className="empty">{emptyMessage}</p>
       )}
     </div>
   );
@@ -193,14 +208,17 @@ export function Insights({
   start,
   end,
   today,
+  onEdit,
 }: {
   entries: Expense[];
   period: Period;
   start: string;
   end: string;
   today: string;
+  onEdit: (expense: Expense) => void;
 }) {
-  const reduce = useReducedMotion(),
+  const [selection, setSelection] = useState<string | null>(null);
+  const reduce = useAppMotion(),
     total = sumExpenses(entries),
     breakdown = categories
       .map((name) => ({
@@ -209,10 +227,15 @@ export function Insights({
       }))
       .filter((e) => e.value)
       .sort((a, b) => b.value - a.value);
-  const buckets: { label: string; value: number; current: boolean }[] = [];
+  const scope = `${period}:${start}:${end}`;
+  useEffect(() => { setSelection(null); }, [scope]);
+  const buckets: { key: string; label: string; title: string; entries: Expense[]; value: number; current: boolean }[] = [];
   if (period === "day")
     categories.forEach((name) =>
       buckets.push({
+        key: `${scope}:${name}`,
+        title: `${name} · ${formatDate(start)}`,
+        entries: entries.filter(e => e.category === name),
         label: name === "Load / data" ? "Load" : name,
         value: sumExpenses(entries.filter((e) => e.category === name)),
         current: false,
@@ -226,6 +249,9 @@ export function Insights({
       const from = dates[i],
         to = dates[Math.min(dates.length - 1, i + step - 1)];
       buckets.push({
+        key: `${scope}:${from}`,
+        title: from === to ? formatDate(from, { weekday: "long", month: "short", day: "numeric" }) : `${formatDate(from)} – ${formatDate(to)}`,
+        entries: entries.filter(e => e.date >= from && e.date <= to),
         label:
           period === "week"
             ? formatDate(from, { weekday: "short" })
@@ -237,6 +263,14 @@ export function Insights({
       });
     }
   }
+  const selected = buckets.find(bucket => bucket.key === selection);
+  const chartMoney = (value: number) =>
+    new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value / 100);
   const max = Math.max(10000, ...buckets.map((b) => b.value)) * 1.25;
   return (
     <>
@@ -247,33 +281,50 @@ export function Insights({
         </div>
         <div
           className="chart"
-          role="img"
+          role="group"
           aria-label={buckets
             .map((b) => `${b.label}: ${money(b.value)}`)
             .join(", ")}
         >
           <div className="axis">
-            <span>{money(max)}</span>
-            <span>{money(max / 2)}</span>
+            <span title={money(max)}>{chartMoney(max)}</span>
+            <span title={money(max / 2)}>{chartMoney(max / 2)}</span>
             <span>₱0</span>
           </div>
           <div className="bars">
             {buckets.map((b) => (
-              <div className="barwrap" key={b.label}>
+              <button type="button" className={`barwrap bar-select${selected && selected.key !== b.key ? " bar-muted" : ""}`} key={b.key}
+                aria-label={`${b.title}: ${money(b.value)}`}
+                aria-pressed={selected?.key === b.key}
+                aria-controls="insights-expenses"
+                onClick={() => setSelection(selection === b.key ? null : b.key)}
+                onKeyDown={event => { if (event.key === "Escape") setSelection(null); }}
+              >
                 <motion.div
-                  className={"bar" + (b.current ? " dark" : "")}
-                  initial={reduce ? false : { height: 0 }}
-                  animate={{ height: `${(b.value / max) * 100}%` }}
-                  transition={{ duration: reduce ? 0 : 0.35 }}
-                >
-                  <span className="barvalue">
-                    {b.value ? money(b.value).replace(".00", "") : ""}
-                  </span>
-                </motion.div>
+                  className={"bar" + (b.current || selected?.key === b.key ? " dark" : "")}
+                  style={{ height: "100%", transformOrigin: "center bottom" }}
+                  initial={reduce ? false : { scaleY: 0 }}
+                  animate={{ scaleY: b.value / max }}
+                  transition={{
+                    duration: reduce ? 0 : progressDuration,
+                    ease: appEase,
+                  }}
+                />
+                <span className="barvalue" title={money(b.value)}>
+                  {b.value ? chartMoney(b.value) : ""}
+                </span>
                 <small>{b.label}</small>
-              </div>
+              </button>
             ))}
           </div>
+        </div>
+        <div id="insights-expenses">
+          {selected && <motion.section className="bar-expenses" aria-label="Selected bar expenses" key={selected.key}
+            initial={reduce ? false : { opacity: 0.7 }} animate={{ opacity: 1 }} transition={{ duration: reduce ? 0 : 0.16, ease: appEase }}>
+            <div className="sectionhead"><h3>{selected.title}</h3><button className="textbutton" onClick={() => { setSelection(null); document.querySelector<HTMLButtonElement>('.bar-select[aria-pressed="true"]')?.focus(); }}>Clear selection</button></div>
+            <p className="bar-selection-total" role="status">{money(selected.value)} · {selected.entries.length} {selected.entries.length === 1 ? "expense" : "expenses"}</p>
+            <Transactions entries={[...selected.entries].reverse().sort((a,b) => b.date.localeCompare(a.date))} today={today} onEdit={onEdit} emptyMessage="No expenses in this bar." />
+          </motion.section>}
         </div>
       </section>
       <section className="breakdown">
@@ -288,9 +339,14 @@ export function Insights({
               <div className="track">
                 <motion.div
                   initial={false}
-                  animate={{ width: `${(b.value / total) * 100}%` }}
-                  transition={{ duration: reduce ? 0 : 0.4 }}
+                  animate={{ scaleX: b.value / total }}
+                  transition={{
+                    duration: reduce ? 0 : progressDuration,
+                    ease: appEase,
+                  }}
                   style={{
+                    width: "100%",
+                    transformOrigin: "left center",
                     background: [
                       "#1d392b",
                       "#546044",

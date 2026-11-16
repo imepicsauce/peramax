@@ -38,10 +38,9 @@ describe("repository migration", () => {
       browserRepository(localStorage).load("2026-11-11").state.expenses,
     ).toEqual([]);
   });
-  it("seeds identifiable demo entries only for a new user", () => {
+  it("starts new users with an empty ledger", () => {
     const result = browserRepository(localStorage).load("2026-11-11");
-    expect(result.state.expenses.length).toBeGreaterThan(0);
-    expect(result.state.expenses.every((e) => e.demo)).toBe(true);
+    expect(result.state.expenses).toEqual([]);
   });
   it("does not overwrite malformed or unsupported state", () => {
     localStorage.setItem(STORAGE_KEY, "{invalid");

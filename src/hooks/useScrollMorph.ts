@@ -1,7 +1,7 @@
 import { useEffect, type RefObject } from "react";
-import { useReducedMotion } from "motion/react";
+import { useAppMotion } from "./useAppMotion";
 export function useScrollMorph(ref: RefObject<HTMLElement | null>) {
-  const reduce = useReducedMotion();
+  const reduce = useAppMotion();
   useEffect(() => {
     const main = ref.current;
     if (!main) return;
@@ -67,7 +67,7 @@ export function useScrollMorph(ref: RefObject<HTMLElement | null>) {
             innerHeight,
         );
       if (bottom <= top) return;
-      const band = Math.min(120, (bottom - top) * 0.24),
+      const band = Math.min(140, (bottom - top) * 0.28),
         updates: [HTMLElement, number, string][] = [];
       visible.forEach((el) => {
         if (!el.getClientRects().length) return;
@@ -75,7 +75,7 @@ export function useScrollMorph(ref: RefObject<HTMLElement | null>) {
           height = el.offsetHeight;
         if (!height || rect.top + height < top - 120 || rect.top > bottom + 120)
           return;
-        const center = rect.top + height / 2;
+        const center = rect.top + rect.height / 2;
         let edge = Math.max(
           0,
           Math.min(
@@ -92,8 +92,8 @@ export function useScrollMorph(ref: RefObject<HTMLElement | null>) {
       });
       updates.forEach(([el, edge, value]) => {
         el.style.setProperty("--morph-edge", value);
-        el.style.setProperty("--morph-x", (1 - edge * 0.06).toFixed(4));
-        el.style.setProperty("--morph-y", (1 - edge * 0.018).toFixed(4));
+        el.style.setProperty("--morph-x", (1 - edge * 0.05).toFixed(4));
+        el.style.setProperty("--morph-y", (1 - edge * 0.015).toFixed(4));
         last.set(el, value);
       });
     }

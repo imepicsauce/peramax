@@ -1,5 +1,8 @@
+import { useBlurPreference } from "./hooks/useBlurPreference";
+import { ActivityControls } from "./features/ActivityControls";
+import { useAppMotion } from "./hooks/useAppMotion";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { Icon, type IconName } from "./components/Icon";
 import { PwaControls } from "./components/PwaControls";
 import { PointerGlow } from "./components/PointerGlow";
@@ -19,35 +22,79 @@ import { useLedger } from "./hooks/useLedger";
 import { useToday } from "./hooks/useToday";
 import { useScrollMorph } from "./hooks/useScrollMorph";
 import {
-  categories,
+  type Payment,
   type Category,
   type Expense,
   type Period,
   type Screen,
 } from "./lib/types";
-import { expensesInRange, movePeriod, periodRange } from "./lib/finance";
+import { More } from "./features/More";
+import { demoExpenses } from "./lib/demo";
+import {
+  expensesInRange,
+  movePeriod,
+  periodRange,
+  planSummary,
+  money,
+} from "./lib/finance";
 type Modal =
   | { type: "expense"; expense?: Expense }
   | { type: "plan" | "savings" | "goal" | "add-savings" | "demo" }
   | null;
 export default function App() {
+  const blurDisabled = useBlurPreference();
+  useEffect(() => {
+    document.documentElement.classList.toggle("no-blur", blurDisabled);
+  }, [blurDisabled]);
   const today = useToday(),
     { state, update, warning } = useLedger(today),
-    reduce = useReducedMotion();
+    reduce = useAppMotion();
   const [screen, setScreen] = useState<Screen>("home"),
     [period, setPeriod] = useState<Period>("week"),
     [anchor, setAnchor] = useState(today),
     [query, setQuery] = useState(""),
+    [paymentFilter, setPaymentFilter] = useState<Payment | "">(""),
+    [sort, setSort] = useState("newest"),
     [filter, setFilter] = useState<Category | "">(""),
     [modal, setModal] = useState<Modal>(null),
     [notice, setNotice] = useState<{ text: string; undo?: () => void } | null>(
       null,
     );
   const main = useRef<HTMLElement>(null);
+  const planButton = useRef<HTMLButtonElement>(null);
+  const [planHighlight, setPlanHighlight] = useState(0);
+  useEffect(() => {
+    if (!planHighlight) return;
+    const timer = setTimeout(() => setPlanHighlight(0), 2800);
+    const dismissOutside = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (
+        planButton.current?.contains(target) ||
+        target.closest(".allowance-guide")
+      )
+        return;
+      setPlanHighlight(0);
+    };
+    const dismissEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPlanHighlight(0);
+    };
+    document.addEventListener("click", dismissOutside, true);
+    document.addEventListener("keydown", dismissEscape);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("click", dismissOutside, true);
+      document.removeEventListener("keydown", dismissEscape);
+    };
+  }, [planHighlight]);
+  function findPlan() {
+    setPlanHighlight((value) => value + 1);
+    planButton.current?.focus({ preventScroll: true });
+  }
   useScrollMorph(main);
   useEffect(() => {
     if (!notice) return;
-    const timer = setTimeout(() => setNotice(null), 6000);
+    const timer = setTimeout(() => setNotice(null), notice.undo ? 15000 : 6000);
     return () => clearTimeout(timer);
   }, [notice]);
   const range = periodRange(anchor, period),
@@ -56,13 +103,28 @@ export default function App() {
     () => [...entries].reverse().sort((a, b) => b.date.localeCompare(a.date)),
     [entries],
   );
-  const filtered = sorted.filter(
-    (e) =>
-      (!filter || e.category === filter) &&
-      (e.note + " " + e.category + " " + e.payment)
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
+  const filtered = sorted
+    .filter(
+      (e) =>
+        (!filter || e.category === filter) &&
+        (!paymentFilter || e.payment === paymentFilter) &&
+        (e.note + " " + e.category + " " + e.payment)
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+    )
+    .sort((a, b) =>
+      sort === "payment"
+        ? a.payment.localeCompare(b.payment) || b.date.localeCompare(a.date)
+        : sort === "oldest"
+          ? a.date.localeCompare(b.date)
+          : b.date.localeCompare(a.date),
+    );
+  const hasFilters = Boolean(filter || paymentFilter || query.trim());
+  function clearFilters() {
+    setFilter("");
+    setPaymentFilter("");
+    setQuery("");
+  }
   function navigate(next: Screen) {
     setScreen(next);
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -75,15 +137,27 @@ export default function App() {
     );
   }
   function saveExpense(expense: Expense) {
+    const nextExpenses = state.expenses.some((e) => e.id === expense.id)
+      ? state.expenses.map((e) => (e.id === expense.id ? expense : e))
+      : [...state.expenses, expense];
+    const balance = planSummary(nextExpenses, state.plan, today);
+    const periodLabel = {
+      day: "today",
+      week: "this week",
+      month: "this month",
+    }[state.plan.frequency];
     update((s) => ({
       ...s,
+      lastPayment: expense.payment,
       expenses: s.expenses.some((e) => e.id === expense.id)
         ? s.expenses.map((e) => (e.id === expense.id ? expense : e))
         : [...s.expenses, expense],
     }));
     setAnchor(expense.date);
     setModal(null);
-    setNotice({ text: "Expense saved." });
+    setNotice({
+      text: `${money(expense.amount)} saved${balance.left === null ? "." : ` · ${money(Math.abs(balance.left))} ${balance.left < 0 ? "over allowance" : "left"} ${periodLabel}.`}`,
+    });
   }
   function deleteExpense(id: string) {
     const removed = state.expenses.find((e) => e.id === id);
@@ -92,7 +166,7 @@ export default function App() {
     update((s) => ({ ...s, expenses: s.expenses.filter((e) => e.id !== id) }));
     setModal(null);
     setNotice({
-      text: "Expense deleted.",
+      text: `${money(removed.amount)} expense deleted.`,
       undo: () => {
         update((s) => {
           if (s.expenses.some((e) => e.id === id)) return s;
@@ -110,7 +184,7 @@ export default function App() {
         ? "Edit expense"
         : "Add expense"
       : modal?.type === "plan"
-        ? "Your plan"
+        ? "My plan"
         : modal?.type === "savings"
           ? "Savings"
           : modal?.type === "goal"
@@ -120,6 +194,10 @@ export default function App() {
             : modal?.type === "add-savings"
               ? "Add savings"
               : "Remove demo expenses";
+  const recent = [...state.expenses]
+    .reverse()
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
   const hasDemo = state.expenses.some((e) => e.demo);
   return (
     <>
@@ -133,7 +211,7 @@ export default function App() {
           >
             peramax<span>.</span>
           </button>
-          <span className="desktop-context">Personal ledger</span>
+          <span className="desktop-context">Everyday spending</span>
           <div className="header-actions">
             <button
               className="header-savings"
@@ -145,11 +223,45 @@ export default function App() {
             </button>
             <button
               className="header-plan"
-              onClick={() => setModal({ type: "plan" })}
+              ref={planButton}
+              onClick={() => {
+                setPlanHighlight(0);
+                setModal({ type: "plan" });
+              }}
               aria-haspopup="dialog"
             >
               <Icon name="wallet" />
               <span>My plan</span>
+              {planHighlight > 0 && (
+                <span
+                  key={planHighlight}
+                  className="plan-attention"
+                  aria-hidden="true"
+                >
+                  <motion.span
+                    className="plan-locator"
+                    initial={reduce ? false : { opacity: 0.9, scale: 1 }}
+                    animate={
+                      reduce
+                        ? { opacity: 1, scale: 1 }
+                        : { opacity: [0.9, 0.7, 0], scale: [1, 1.07, 1.16] }
+                    }
+                    transition={
+                      reduce
+                        ? { duration: 0 }
+                        : { duration: 0.75, repeat: 2, ease: "easeOut" }
+                    }
+                  />
+                  <motion.span
+                    className="plan-hint"
+                    initial={reduce ? false : { opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: reduce ? 0 : 0.18 }}
+                  >
+                    Edit your allowance here
+                  </motion.span>
+                </span>
+              )}
             </button>
           </div>
         </header>
@@ -157,120 +269,169 @@ export default function App() {
           <div className="pagehead">
             <h1>
               {
-                { home: "Home", activity: "Activity", insights: "Insights" }[
-                  screen
-                ]
+                {
+                  home: "Home",
+                  activity: "Activity",
+                  insights: "Insights",
+                  more: "More",
+                }[screen]
               }
             </h1>
           </div>
+          {hasDemo && (
+            <div className="demo-notice">
+              <span>You’re viewing example expenses.</span>
+              <button
+                className="textbutton"
+                onClick={() => setModal({ type: "demo" })}
+              >
+                Remove examples
+              </button>
+            </div>
+          )}
           {warning && (
             <p className="warning storage-warning" role="alert">
               {warning}
             </p>
           )}
-          <BudgetWarnings expenses={state.expenses} plan={state.plan} today={today} onPlan={() => setModal({ type: "plan" })} />
+          <BudgetWarnings
+            expenses={state.expenses}
+            plan={state.plan}
+            today={today}
+            onPlan={() => setModal({ type: "plan" })}
+          />
           <motion.div
             key={screen}
             className={`screen-content screen-${screen}`}
-            initial={reduce ? false : { opacity: 0.5, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.24 }}
+            initial={reduce ? false : { opacity: 0.85 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: reduce ? 0 : 0.16 }}
           >
-            {screen === "home" && (
-              <Dashboard
-                expenses={state.expenses}
-                plan={state.plan}
-                today={today}
-                onPlan={() => setModal({ type: "plan" })}
-              />
-            )}
-            <PeriodPicker
-              period={period}
-              start={range.start}
-              end={range.end}
-              onPeriod={setPeriod}
-              onMove={(direction) =>
-                setAnchor((a) => movePeriod(a, period, direction))
-              }
-              onToday={() => setAnchor(today)}
-            />
-            {screen !== "activity" && (
-              <Summary
-                entries={entries}
-                period={period}
-                start={range.start}
-                end={range.end}
-                today={today}
-              />
-            )}
-            {screen === "insights" ? (
-              <Insights
-                entries={entries}
-                period={period}
-                start={range.start}
-                end={range.end}
-                today={today}
-              />
+            {screen === "more" ? (
+              <More />
             ) : (
-              <section className="transactions">
-                <div className="sectionhead">
-                  <h2>
-                    {screen === "activity" ? "Transactions" : "Recent activity"}{" "}
-                    <span className="count">{entries.length}</span>
-                  </h2>
-                  {screen === "home" && (
-                    <button
-                      className="textbutton"
-                      onClick={() => navigate("activity")}
-                    >
-                      View all ↗
-                    </button>
-                  )}
-                </div>
-                {screen === "activity" && (
-                  <div className="filters">
-                    <input
-                      aria-label="Search transactions"
-                      placeholder="Search notes, categories, or payment…"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                    />
-                    <select
-                      aria-label="Filter category"
-                      value={filter}
-                      onChange={(e) =>
-                        setFilter(e.target.value as Category | "")
-                      }
-                    >
-                      <option value="">All categories</option>
-                      {categories.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
+              <>
+                {screen === "home" && (
+                  <Dashboard
+                    expenses={state.expenses}
+                    plan={state.plan}
+                    today={today}
+                    onPlan={() => setModal({ type: "plan" })}
+                    onFindPlan={findPlan}
+                    onAdd={() => setModal({ type: "expense" })}
+                  />
                 )}
-                <Transactions
-                  entries={screen === "home" ? sorted.slice(0, 8) : filtered}
-                  today={today}
-                  onEdit={(expense) => setModal({ type: "expense", expense })}
-                />
-              </section>
+                {screen !== "home" && (
+                  <PeriodPicker
+                    period={period}
+                    start={range.start}
+                    end={range.end}
+                    onPeriod={setPeriod}
+                    onMove={(direction) =>
+                      setAnchor((a) => movePeriod(a, period, direction))
+                    }
+                    onToday={() => setAnchor(today)}
+                  />
+                )}
+                {screen === "insights" && (
+                  <Summary
+                    entries={entries}
+                    period={period}
+                    start={range.start}
+                    end={range.end}
+                    today={today}
+                  />
+                )}
+                {screen === "insights" ? (
+                  <Insights
+                    onEdit={expense => setModal({ type: "expense", expense })}
+                    entries={entries}
+                    period={period}
+                    start={range.start}
+                    end={range.end}
+                    today={today}
+                  />
+                ) : (
+                  <section className="transactions">
+                    <div className="sectionhead">
+                      <h2>
+                        {screen === "activity"
+                          ? "Transactions"
+                          : "Recent activity"}{" "}
+                        <span className="count">
+                          {screen === "home"
+                            ? `${recent.length} of ${state.expenses.length}`
+                            : filtered.length}
+                        </span>
+                      </h2>
+                      {screen === "home" && (
+                        <button
+                          className="textbutton"
+                          onClick={() => {
+                            clearFilters();
+                            setPeriod("month");
+                            setAnchor(recent[0]?.date ?? today);
+                            navigate("activity");
+                          }}
+                        >
+                          View all
+                        </button>
+                      )}
+                    </div>
+                    {screen === "activity" && (
+                      <ActivityControls
+                        query={query}
+                        onQuery={setQuery}
+                        category={filter}
+                        onCategory={setFilter}
+                        payment={paymentFilter}
+                        onPayment={setPaymentFilter}
+                        sort={sort}
+                        onSort={setSort}
+                        entries={entries}
+                        matching={filtered}
+                        onClear={clearFilters}
+                      />
+                    )}
+                    <Transactions
+                      emptyMessage={
+                        screen === "activity" && hasFilters
+                          ? "No matching expenses. Clear filters to see this period’s entries."
+                          : "No expenses for this period."
+                      }
+                      entries={screen === "home" ? recent : filtered}
+                      today={today}
+                      onEdit={(expense) =>
+                        setModal({ type: "expense", expense })
+                      }
+                    />
+                  </section>
+                )}
+              </>
             )}
           </motion.div>
+          {state.expenses.length === 0 && state.plan.allowance === null && (
+            <div className="first-run">
+              <p>
+                Start with your allowance, then log what you spend. Your entries
+                stay on this device.
+              </p>
+              <button
+                className="textbutton"
+                onClick={() =>
+                  update((s) => ({ ...s, expenses: demoExpenses(today) }))
+                }
+              >
+                Try demo expenses
+              </button>
+            </div>
+          )}
           <PwaControls blocked={modal !== null} />
           <footer>
             <span>
               {hasDemo ? "Includes demo expenses · " : " "}Saved on this device
             </span>
-            {hasDemo && (
-              <button
-                className="textbutton"
-                onClick={() => setModal({ type: "demo" })}
-              >
-                Remove demo expenses
-              </button>
-            )}
-            <span>Philippine peso · Asia/Manila</span>
+            <span>PHP · Asia/Manila</span>
           </footer>
         </main>
       </div>
@@ -278,7 +439,7 @@ export default function App() {
         <div className="desktop-nav-brand" aria-hidden="true">
           peramax<span>.</span>
         </div>
-        {(["home", "activity", "add", "plan", "insights"] as const).map(
+        {(["home", "activity", "add", "insights", "more"] as const).map(
           (item) => (
             <button
               key={item}
@@ -287,24 +448,25 @@ export default function App() {
                 (item === "add" ? " nav-add" : "") +
                 (item === screen ? " active" : "")
               }
-              aria-label={item === "add" ? "Add expense" : undefined}
-              aria-current={item === screen ? "page" : undefined}
-              aria-haspopup={
-                item === "add" || item === "plan" ? "dialog" : undefined
-              }
-              onClick={() =>
+              aria-label={
                 item === "add"
-                  ? setModal({ type: "expense" })
-                  : item === "plan"
-                    ? setModal({ type: "plan" })
-                    : navigate(item)
+                  ? "Add expense"
+                  : item === "more"
+                    ? "More"
+                    : undefined
+              }
+              aria-current={item === screen ? "page" : undefined}
+              aria-haspopup={item === "add" ? "dialog" : undefined}
+              onClick={() =>
+                item === "add" ? setModal({ type: "expense" }) : navigate(item)
               }
             >
               {item === screen && (
                 <motion.span
                   className="nav-pill"
-                  layoutId="nav-pill"
-                  transition={{ duration: reduce ? 0 : 0.26 }}
+                  initial={reduce ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: reduce ? 0 : 0.16 }}
                 />
               )}
               <i>
@@ -314,7 +476,7 @@ export default function App() {
                       home: "home",
                       activity: "list",
                       add: "plus",
-                      plan: "wallet",
+                      more: "other",
                       insights: "chart",
                     }[item] as IconName
                   }
@@ -326,7 +488,7 @@ export default function App() {
                     home: "Home",
                     activity: "Activity",
                     add: "Add",
-                    plan: "Plan",
+                    more: "More",
                     insights: "Insights",
                   }[item]
                 }
@@ -339,6 +501,7 @@ export default function App() {
       <Sheet
         open={modal !== null}
         title={title}
+        autoFocusInput={modal?.type === "expense" && !modal.expense}
         screenKey={
           modal?.type === "expense"
             ? `expense-${modal.expense?.id || "new"}`
@@ -349,6 +512,7 @@ export default function App() {
         {modal?.type === "expense" ? (
           <ExpenseForm
             expense={modal.expense}
+            lastPayment={state.lastPayment}
             today={today}
             onSave={saveExpense}
             onDelete={deleteExpense}
@@ -421,17 +585,25 @@ export default function App() {
           </div>
         ) : null}
       </Sheet>
-      {notice && (
-        <motion.div
-          className="toast"
-          role="status"
-          initial={reduce ? false : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <span>{notice.text}</span>
-          {notice.undo && <button onClick={notice.undo}>Undo</button>}
-        </motion.div>
-      )}
+      <AnimatePresence initial={false}>
+        {notice && (
+          <motion.div
+            className="toast"
+            key="notice"
+            exit={{ opacity: 0, y: reduce ? 0 : 4 }}
+            transition={{
+              duration: reduce ? 0 : 0.16,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            role="status"
+            initial={reduce ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <span>{notice.text}</span>
+            {notice.undo && <button onClick={notice.undo}>Undo</button>}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

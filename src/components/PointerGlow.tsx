@@ -1,74 +1,54 @@
+import { useBlurPreference } from "../hooks/useBlurPreference";
+import { useAppMotion } from "../hooks/useAppMotion";
 import { useEffect, useRef } from "react";
-import { useReducedMotion } from "motion/react";
 export function PointerGlow({ blocked }: { blocked: boolean }) {
+  const blurDisabled = useBlurPreference();
   const ref = useRef<HTMLDivElement>(null),
-    reduce = useReducedMotion();
+    reduce = useAppMotion();
   useEffect(() => {
     const layer = ref.current;
     if (!layer) return;
-    let frame = 0,
-      touch: number | null = null,
-      x = 0,
-      y = 0;
+    const fine = matchMedia("(hover: hover) and (pointer: fine)");
+    let frame = 0;
     const hide = () => {
       cancelAnimationFrame(frame);
       frame = 0;
       layer.classList.remove("visible");
     };
-    if (blocked || reduce) {
+    if (blocked || reduce || blurDisabled) {
       hide();
       return;
     }
-    const show = (e: PointerEvent) => {
-      x = e.clientX;
-      y = e.clientY;
-      if (!frame)
-        frame = requestAnimationFrame(() => {
-          layer.style.setProperty("--glow-x", `${x - 150}px`);
-          layer.style.setProperty("--glow-y", `${y - 150}px`);
-          layer.classList.add("visible");
-          frame = 0;
-        });
-    };
-    const down = (e: PointerEvent) => {
-      if (!e.isPrimary) return;
-      if (e.pointerType !== "mouse") touch = e.pointerId;
-      show(e);
-    };
-    const move = (e: PointerEvent) => {
-      if (e.isPrimary && (e.pointerType === "mouse" || touch === e.pointerId))
-        show(e);
-    };
-    const up = (e: PointerEvent) => {
-      if (touch === e.pointerId) {
-        touch = null;
+    const move = (event: PointerEvent) => {
+      if (!fine.matches || event.pointerType !== "mouse" || !event.isPrimary) {
         hide();
+        return;
       }
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        layer.style.setProperty("--glow-x", `${event.clientX - 150}px`);
+        layer.style.setProperty("--glow-y", `${event.clientY - 150}px`);
+        layer.classList.add("visible");
+        frame = 0;
+      });
     };
-    const out = (e: PointerEvent) => {
-      if (!e.relatedTarget) hide();
+    const out = (event: PointerEvent) => {
+      if (!event.relatedTarget) hide();
     };
-    const visibility = () => {
-      if (document.hidden) hide();
-    };
-    document.addEventListener("pointerdown", down, { passive: true });
     document.addEventListener("pointermove", move, { passive: true });
-    document.addEventListener("pointerup", up, { passive: true });
-    document.addEventListener("pointercancel", hide, { passive: true });
     document.addEventListener("pointerout", out, { passive: true });
+    document.addEventListener("visibilitychange", hide);
     window.addEventListener("blur", hide);
-    document.addEventListener("visibilitychange", visibility);
+    fine.addEventListener("change", hide);
     return () => {
       hide();
-      document.removeEventListener("pointerdown", down);
       document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", up);
-      document.removeEventListener("pointercancel", hide);
       document.removeEventListener("pointerout", out);
+      document.removeEventListener("visibilitychange", hide);
       window.removeEventListener("blur", hide);
-      document.removeEventListener("visibilitychange", visibility);
+      fine.removeEventListener("change", hide);
     };
-  }, [blocked, reduce]);
+  }, [blocked, reduce, blurDisabled]);
   return (
     <div className="pointer-glow" aria-hidden="true" ref={ref}>
       <div />

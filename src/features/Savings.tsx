@@ -1,5 +1,7 @@
+import { appEase, progressDuration } from "../lib/motion";
+import { useAppMotion } from "../hooks/useAppMotion";
 import { useState, type FormEvent } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import {
   amountInput,
   formatDate,
@@ -21,7 +23,7 @@ export function SavingsHub({
   onEdit: () => void;
   onAdd: () => void;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useAppMotion();
   return (
     <section>
       <div className="sectionhead">
@@ -66,10 +68,14 @@ export function SavingsHub({
           >
             <motion.div
               initial={false}
+              style={{ width: "100%", transformOrigin: "left center" }}
               animate={{
-                width: `${Math.min(100, (goal.saved / goal.target) * 100)}%`,
+                scaleX: Math.min(1, goal.saved / goal.target),
               }}
-              transition={{ duration: reduce ? 0 : 0.4 }}
+              transition={{
+                duration: reduce ? 0 : progressDuration,
+                ease: appEase,
+              }}
             />
           </div>
           <div className="goal-meta">

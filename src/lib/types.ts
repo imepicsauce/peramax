@@ -16,7 +16,7 @@ export const payments = [
 export type Category = (typeof categories)[number];
 export type Payment = (typeof payments)[number];
 export type Period = "day" | "week" | "month";
-export type Screen = "home" | "activity" | "insights";
+export type Screen = "home" | "activity" | "insights" | "more";
 /** All amounts are integer centavos, never fractional pesos. */
 export interface Expense {
   id: string;
@@ -42,6 +42,7 @@ export interface SavingsGoal {
 }
 export interface AppState {
   schemaVersion: 1;
+  lastPayment?: Payment;
   expenses: Expense[];
   plan: Plan;
   goal: SavingsGoal | null;

@@ -1,11 +1,5 @@
 # Peramax
 
-## Flutter Android app
-
-The native Flutter version lives in [`flutter_app/`](flutter_app/README.md). Run `flutter pub get` and `flutter run` from that directory. The React app below remains available as a separate implementation; records do not automatically transfer between the two apps.
-
-Android installer and GitHub Release packaging: [installation instructions](flutter_app/INSTALL.md) · [release guide](flutter_app/RELEASING.md).
-
 A mobile-first personal expense tracker for everyday Filipino use, built with **React 19, TypeScript, Vite, and Motion for React**. This repository is the working application migrated from the interactive design prototype.
 
 ## Run locally
@@ -17,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. No environment variables or cloud credentials are required. The initial view includes clearly marked demo expenses; use **Remove demo expenses** in the footer to remove only examples. Your own entries, plan, and savings goal remain.
+Open the local URL printed by Vite. No environment variables or cloud credentials are required. The initial view starts empty. Choose **Try demo expenses** to explore examples; the notice at the top lets you remove only those examples. Your own entries, plan, and savings goal remain.
 
 ```sh
 npm test          # Financial rules, persistence/migration, and UI journeys
@@ -110,6 +104,11 @@ Installation and offline/update testing are documented in `docs/PWA.md`.
 Next: follow `docs/ROADMAP.md` to add authentication and Supabase, then an explicit offline synchronization design.
 
 ### Weekly allowance savings
+
 My plan supports daily, weekly, and calendar-month allowances. A weekly saving goal tracks money left unspent for one selected Monday–Sunday week, separately from manually recorded Savings. Daily allowance is multiplied by seven; monthly allowance is allocated by each calendar day's share (including weeks spanning two months), rounded once to centavos. Editing the allowance recalculates the selected goal. Goal success is evaluated after Sunday using logged expenses; no savings transfer or automatic renewal occurs. Blank target removes the goal. Existing stored plans remain compatible.
 
 Budget warnings appear across Home, Activity, and Insights at 80% of a configured allowance or daily/weekly limit. At 100% they show reached/used up, and above 100% they show the excess in pesos. Warnings recalculate after edits, deletions, plan changes, and Philippine calendar rollover. These are in-app reminders, not push notifications.
+
+### Local UX review
+
+See [UX-CHANGES.md](docs/UX-CHANGES.md) for the mobile daily-use changes, compatibility notes, and device QA checklist. New users now start with an empty ledger and can choose demo expenses.
